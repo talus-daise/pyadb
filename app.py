@@ -73,6 +73,7 @@ class AdbGui(QWidget):
 
         install_layout = QHBoxLayout()
         self.apk_input = QLineEdit()
+        self.apk_input.setPlaceholderText("choose file...")
         browse_btn = QPushButton("Browse")
         browse_btn.clicked.connect(self.select_file)
         install_btn = QPushButton("Install")
@@ -83,6 +84,7 @@ class AdbGui(QWidget):
 
         uninstall_layout = QHBoxLayout()
         self.pkg_input = QLineEdit()
+        self.pkg_input.setPlaceholderText("com.example.app")
         uninstall_btn = QPushButton("Uninstall")
         uninstall_btn.clicked.connect(self.adb_uninstall)
         uninstall_layout.addWidget(self.pkg_input)

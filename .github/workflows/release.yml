@@ -19,8 +19,7 @@ jobs:
                   python-version: "3.11"
 
             - name: Install deps
-              run: |
-                  pip install -r requirements.txt
+              run: pip install -r requirements.txt
 
             - name: Download adb
               run: |
@@ -31,15 +30,17 @@ jobs:
             - name: Build
               run: |
                   pyinstaller --onefile --windowed --name PyADB --add-binary "adb.exe;." app.py
+                  move dist\PyADB.exe dist\PyADB-${{ github.ref_name }}-windows.exe
 
             - uses: softprops/action-gh-release@v2
               with:
-                  files: dist/PyADB.exe
+                  files: dist/PyADB-${{ github.ref_name }}-windows.exe
 
     macos:
         runs-on: macos-latest
         steps:
             - uses: actions/checkout@v4
+
             - uses: actions/setup-python@v5
               with:
                   python-version: "3.11"
@@ -56,19 +57,20 @@ jobs:
             - name: Build
               run: |
                   pyinstaller --onefile --windowed --name PyADB \
-                      --add-binary "adb:." \
-                      app.py
-                  cd dist && zip -r PyADB-mac.zip PyADB.app
+                    --add-binary "adb:." \
+                    app.py
+                  cd dist
+                  zip -r PyADB-${{ github.ref_name }}-macos.zip PyADB.app
 
-            - name: Create Release
-              uses: softprops/action-gh-release@v2
+            - uses: softprops/action-gh-release@v2
               with:
-                  files: dist/PyADB-mac.zip
+                  files: dist/PyADB-${{ github.ref_name }}-macos.zip
 
     linux:
         runs-on: ubuntu-22.04
         steps:
             - uses: actions/checkout@v4
+
             - uses: actions/setup-python@v5
               with:
                   python-version: "3.11"
@@ -89,6 +91,11 @@ jobs:
 
             - name: Build binary
               run: |
-                  pyinstaller --onefile --windowed --name pyadb \
-                      --add-binary "adb:." \
-                      app.py
+                  pyinstaller --onefile --windowed --name PyADB \
+                    --add-binary "adb:." \
+                    app.py
+                  mv dist/PyADB dist/PyADB-${{ github.ref_name }}-linux
+
+            - uses: softprops/action-gh-release@v2
+              with:
+                  files: dist/PyADB-${{ github.ref_name }}-linux
