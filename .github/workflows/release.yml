@@ -83,15 +83,23 @@ jobs:
               run: |
                 sudo apt update
                 sudo apt install -y \
-                python3-dev build-essential fakeroot patchelf dpkg \
-                libfuse2 squashfs-tools wget desktop-file-utils imagemagick
+                python3-dev build-essential fakeroot patchelf dpkg imagemagick
 
             - name: Install python deps
               run: pip install -r requirements.txt
+            
+            - name: Download adb
+              run: |
+                curl -LO https://dl.google.com/android/repository/platform-tools-latest-linux.zip
+                unzip platform-tools-latest-linux.zip
+                cp platform-tools/adb .
+                chmod +x adb
 
             - name: Build binary
               run: |
-                pyinstaller --onefile --windowed --name PyADB app.py
+                pyinstaller --onefile --windowed --name PyADB \
+                    --add-binary "adb:." \
+                    app.py
 
             # -----------------------
             # deb パッケージ作成
@@ -120,42 +128,11 @@ jobs:
 
                 dpkg-deb --build pkg PyADB-${{ github.ref_name }}-linux.deb
 
-            # -----------------------
-            # AppImage 作成
-            # -----------------------
             - name: Build AppImage
-              run: |
-                VERSION=${{ github.ref_name }}
-                VERSION=${VERSION#v}
+              uses: AppImageCrafters/build-appimage-action@master
+              with:
+                recipe: appimage-builder.yml
 
-                mkdir -p AppDir/usr/bin
-                mkdir -p AppDir/usr/share/applications
-                mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-
-                cp dist/PyADB AppDir/usr/bin/pyadb
-
-                cat > AppDir/usr/share/applications/pyadb.desktop <<EOF
-                [Desktop Entry]
-                Type=Application
-                Name=PyADB
-                Exec=pyadb
-                Icon=pyadb
-                Categories=Utility;
-                EOF
-
-                # 仮アイコン（なければ差し替え推奨）
-                convert -size 256x256 xc:lightgray AppDir/usr/share/icons/hicolor/256x256/apps/pyadb.png
-
-                wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/linuxdeploy-x86_64.AppImage
-                chmod +x linuxdeploy-x86_64.AppImage
-
-                ./linuxdeploy-x86_64.AppImage --appimage-extract-and-run \
-                --appdir AppDir \
-                --desktop-file AppDir/usr/share/applications/pyadb.desktop \
-                --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/pyadb.png \
-                --output appimage
-
-                mv PyADB-*.AppImage PyADB-${{ github.ref_name }}-linux.AppImage
 
             # -----------------------
             # Release
@@ -164,4 +141,4 @@ jobs:
               with:
                 files: |
                     PyADB-${{ github.ref_name }}-linux.deb
-                    PyADB-${{ github.ref_name }}-linux.AppImage
+                    *.AppImage
