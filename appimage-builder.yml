@@ -34,11 +34,6 @@ AppDir:
     version: ${VERSION}
     exec: usr/bin/pyadb
 
-  apt:
-    arch: amd64
-    include: []
-    exclude: []
-
 AppImage:
   name: PyADB
   arch: x86_64
