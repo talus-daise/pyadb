@@ -21,8 +21,7 @@ script:
     EOF
 
   # 仮アイコン（推奨：後で差し替え）
-  - convert -size 256x256 xc:lightgray \
-    AppDir/usr/share/icons/hicolor/256x256/apps/pyadb.png
+  - cp assets/pyadb.png AppDir/usr/share/icons/hicolor/256x256/apps/pyadb.png
 
 AppDir:
   path: AppDir
