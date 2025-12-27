@@ -30,11 +30,15 @@ jobs:
             - name: Build
               run: |
                   pyinstaller --onefile --windowed --name PyADB --add-binary "adb.exe;." app.py
-                  move dist\PyADB.exe dist\PyADB-${{ github.ref_name }}-windows.exe
+                  mkdir release
+                  move dist\PyADB.exe release\
+                  copy adb.exe release\
+                  cd release
+                  tar -a -c -f PyADB-${{ github.ref_name }}-windows.zip *
 
             - uses: softprops/action-gh-release@v2
               with:
-                  files: dist/PyADB-${{ github.ref_name }}-windows.exe
+                  files: release/PyADB-${{ github.ref_name }}-windows.zip
 
     macos:
         runs-on: macos-latest
@@ -73,29 +77,44 @@ jobs:
 
             - uses: actions/setup-python@v5
               with:
-                  python-version: "3.11"
+                python-version: "3.11"
 
             - name: Install system deps
               run: |
-                  sudo apt update
-                  sudo apt install -y python3-dev build-essential fakeroot patchelf
+                sudo apt update
+                sudo apt install -y python3-dev build-essential fakeroot patchelf dpkg
 
             - name: Install python deps
               run: pip install -r requirements.txt
 
-            - name: Download adb
-              run: |
-                  curl -LO https://dl.google.com/android/repository/platform-tools-latest-linux.zip
-                  unzip platform-tools-latest-linux.zip
-                  cp platform-tools/adb .
-
             - name: Build binary
               run: |
-                  pyinstaller --onefile --windowed --name PyADB \
-                    --add-binary "adb:." \
-                    app.py
-                  mv dist/PyADB dist/PyADB-${{ github.ref_name }}-linux
+                pyinstaller --onefile --windowed --name PyADB app.py
+
+            - name: Build deb package
+              run: |
+                VERSION=${{ github.ref_name }}
+                VERSION=${VERSION#v}
+
+                mkdir -p pkg/DEBIAN
+                mkdir -p pkg/usr/bin
+
+                cp dist/PyADB pkg/usr/bin/pyadb
+
+                cat > pkg/DEBIAN/control <<EOF
+                Package: pyadb
+                Version: ${VERSION}
+                Section: utils
+                Priority: optional
+                Architecture: amd64
+                Depends: python3, python3-pyside6, android-tools-adb
+                Maintainer: PyADB
+                Description: PyADB GUI tool
+                PyADB is a simple GUI frontend for Android Debug Bridge.
+                EOF
+
+                dpkg-deb --build pkg PyADB-${{ github.ref_name }}-linux.deb
 
             - uses: softprops/action-gh-release@v2
               with:
-                  files: dist/PyADB-${{ github.ref_name }}-linux
+                files: PyADB-${{ github.ref_name }}-linux.deb

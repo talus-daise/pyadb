@@ -3,6 +3,8 @@ import zipfile
 import tempfile
 import shutil
 from pathlib import Path
+import logging
+from datetime import datetime
 
 from PySide6.QtWidgets import (
     QApplication,
@@ -15,17 +17,48 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QLabel,
     QListWidget,
-    QListWidgetItem,
 )
 from PySide6.QtCore import QProcess
-from PySide6.QtGui import QColor, QTextCharFormat, QTextCursor, QFont
+from PySide6.QtGui import QColor, QTextCharFormat, QTextCursor
+import shutil
+
+
+# ===============================
+# CLI ログ設定
+# ===============================
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="[{asctime}] [{levelname}] {message}",
+    style="{",
+)
+log = logging.getLogger("PyADB")
+
+
+def cli_log(message, level=logging.INFO):
+    log.log(level, message)
 
 
 def get_adb_path():
+    # frozen（PyInstaller）時
     if getattr(sys, "frozen", False):
         base = Path(sys.executable).parent
-        return str(base / ("adb.exe" if sys.platform == "win32" else "adb"))
-    return "adb"
+        bundled_adb = base / ("adb.exe" if sys.platform == "win32" else "adb")
+
+        if bundled_adb.exists():
+            cli_log(f"Using bundled adb: {bundled_adb}", logging.INFO)
+            return str(bundled_adb)
+
+        cli_log("Bundled adb not found, trying system adb", logging.WARNING)
+
+    # PATH 上の adb を探す
+    system_adb = shutil.which("adb")
+    if system_adb:
+        cli_log(f"Using system adb: {system_adb}", logging.INFO)
+        return system_adb
+
+    # どこにも無い場合
+    cli_log("ADB not found (bundled nor system)", logging.ERROR)
+    return "adb"  # 最後の保険（失敗時にエラーログが出る）
 
 
 class AdbGui(QWidget):
@@ -34,15 +67,23 @@ class AdbGui(QWidget):
         self.setWindowTitle("PyADB")
         self.resize(700, 450)
 
+        cli_log("Initializing AdbGui")
+
         self.process = QProcess(self)
         self.process.readyReadStandardOutput.connect(self.read_output)
         self.process.readyReadStandardError.connect(self.read_output)
+        self.process.started.connect(
+            lambda: cli_log("ADB process started", logging.DEBUG)
+        )
+        self.process.finished.connect(self.on_process_finished)
 
         self.temp_dir = None
         self.current_device = None
         self.init_ui()
 
     def init_ui(self):
+        cli_log("Initializing UI", logging.DEBUG)
+
         main_layout = QHBoxLayout()
 
         # ========= 左ペイン =========
@@ -107,24 +148,42 @@ class AdbGui(QWidget):
 
         self.setLayout(main_layout)
 
+    # ===============================
+    # ADB 実行
+    # ===============================
     def run_adb(self, args):
         cmd = args
         if self.current_device and args[0] not in ("devices", "connect"):
             cmd = ["-s", self.current_device] + args
 
+        cli_log(f"Executing adb command: adb {' '.join(cmd)}", logging.DEBUG)
         self.append_log(f"$ adb {' '.join(cmd)}", cmd=True)
-        self.process.start(get_adb_path(), cmd)
+
+        adb_path = get_adb_path()
+        cli_log(f"ADB binary path: {adb_path}", logging.DEBUG)
+        self.process.start(adb_path, cmd)
 
     def adb_connect(self):
         addr = self.addr_input.text().strip()
+        cli_log(f"Connect requested: {addr}", logging.DEBUG)
         if addr:
             self.run_adb(["connect", addr])
+            self.adb_devices()
+
+    def adb_devices(self):
+        cli_log("Refreshing device list", logging.DEBUG)
+        self.devices_list.clear()
+        self.run_adb(["devices"])
 
     def adb_uninstall(self):
         pkg = self.pkg_input.text().strip()
+        cli_log(f"Uninstall requested: {pkg}", logging.DEBUG)
         if pkg:
             self.run_adb(["uninstall", pkg])
 
+    # ===============================
+    # APK / Bundle
+    # ===============================
     def select_file(self):
         path, _ = QFileDialog.getOpenFileName(
             self,
@@ -132,12 +191,16 @@ class AdbGui(QWidget):
             "",
             "Android Packages (*.apk *.xapk *.apkm)",
         )
+        cli_log(f"File selected: {path}", logging.DEBUG)
         if path:
             self.apk_input.setText(path)
 
     def install_auto(self):
         path = Path(self.apk_input.text())
+        cli_log(f"Install requested: {path}", logging.DEBUG)
+
         if not path.exists():
+            cli_log("Selected file does not exist", logging.ERROR)
             return
 
         suffix = path.suffix.lower()
@@ -148,57 +211,64 @@ class AdbGui(QWidget):
             self.install_bundle(path)
 
     def install_bundle(self, archive_path: Path):
+        cli_log(f"Extracting bundle: {archive_path}", logging.DEBUG)
         self.append_log("Extracting bundle...", cmd=True)
+
         self.temp_dir = Path(tempfile.mkdtemp(prefix="adb_bundle_"))
+        cli_log(f"Temporary directory created: {self.temp_dir}", logging.DEBUG)
 
         with zipfile.ZipFile(archive_path, "r") as z:
             z.extractall(self.temp_dir)
 
         apk_files = sorted(str(p) for p in self.temp_dir.rglob("*.apk"))
+        cli_log(f"APK files found: {apk_files}", logging.DEBUG)
 
         if not apk_files:
-            self.log.append("ERROR: No APK files found")
+            self.append_log("ERROR: No APK files found", error=True)
+            cli_log("No APK files found in bundle", logging.ERROR)
             return
-
-        self.append_log("install-multiple:", cmd=True)
-        for apk in apk_files:
-            self.log.append(f"  {apk}")
-
-        self.append_log("\nInstalling bundle...\n", cmd=True)
 
         self.run_adb(["install-multiple", "-r", *apk_files])
 
+    # ===============================
+    # QProcess 出力
+    # ===============================
     def read_output(self):
-        out = self.process.readAllStandardOutput().data().decode()
-        err = self.process.readAllStandardError().data().decode()
+        out = self.process.readAllStandardOutput().data().decode(errors="ignore")
+        err = self.process.readAllStandardError().data().decode(errors="ignore")
 
         if out:
+            cli_log(f"STDOUT:\n{out.rstrip()}", logging.DEBUG)
+
             if "List of devices attached" in out:
+                self.devices_list.clear()
                 lines = out.strip().splitlines()[1:]
                 for line in lines:
-                    if not line.strip():
-                        continue
-                    serial, state = line.split()
-                    self.devices_list.addItem(f"{serial}  [{state}]")
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        serial, state = parts[0], parts[1]
+                        cli_log(f"Device detected: {serial} [{state}]", logging.INFO)
+                        self.devices_list.addItem(f"{serial}  [{state}]")
             else:
                 self.append_log(out.strip())
 
         if err:
+            cli_log(f"STDERR:\n{err.rstrip()}", logging.WARNING)
             self.append_log(err.strip(), error=True)
 
-    def closeEvent(self, event):
-        if self.temp_dir and self.temp_dir.exists():
-            shutil.rmtree(self.temp_dir)
-        event.accept()
+    def on_process_finished(self, code, status):
+        cli_log(
+            f"ADB process finished: exitCode={code}, status={status}", logging.DEBUG
+        )
 
-    def adb_devices(self):
-        self.devices_list.clear()
-        self.run_adb(["devices"])
-
+    # ===============================
+    # UI 補助
+    # ===============================
     def on_device_selected(self):
         items = self.devices_list.selectedItems()
         if items:
             self.current_device = items[0].text().split()[0]
+            cli_log(f"Device selected: {self.current_device}", logging.INFO)
             self.append_log(f"Selected device: {self.current_device}", cmd=True)
 
     def append_log(self, text, cmd=False, error=False):
@@ -206,7 +276,6 @@ class AdbGui(QWidget):
         cursor.movePosition(QTextCursor.End)
 
         fmt = QTextCharFormat()
-
         if error:
             fmt.setForeground(QColor("#ff4d4d"))
         elif cmd:
@@ -217,8 +286,16 @@ class AdbGui(QWidget):
         cursor.insertText(text + "\n", fmt)
         self.log.setTextCursor(cursor)
 
+    def closeEvent(self, event):
+        cli_log("Application closing", logging.DEBUG)
+        if self.temp_dir and self.temp_dir.exists():
+            cli_log(f"Removing temp directory: {self.temp_dir}", logging.DEBUG)
+            shutil.rmtree(self.temp_dir)
+        event.accept()
+
 
 if __name__ == "__main__":
+    cli_log("PyADB starting")
     app = QApplication(sys.argv)
     w = AdbGui()
     w.show()
