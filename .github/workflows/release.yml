@@ -1,0 +1,92 @@
+name: Build & Release PyADB
+
+on:
+    push:
+        tags:
+            - "v*"
+
+jobs:
+    windows:
+        runs-on: windows-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-python@v5
+              with:
+                  python-version: "3.11"
+
+            - name: Install deps
+              run: |
+                  pip install -r requirements.txt
+
+            - name: Download adb
+              run: |
+                  curl -L -o platform-tools.zip https://dl.google.com/android/repository/platform-tools-latest-windows.zip
+                  tar -xf platform-tools.zip
+                  copy platform-tools\adb.exe .
+
+            - name: Build
+              run: |
+                  pyinstaller --onefile --windowed --name PyADB ^
+                    --add-binary "adb.exe;." ^
+                    app.py
+
+            - uses: softprops/action-gh-release@v2
+              with:
+                  files: dist/PyADB.exe
+
+    macos:
+        runs-on: macos-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-python@v5
+              with:
+                  python-version: "3.11"
+
+            - name: Install deps
+              run: pip install -r requirements.txt
+
+            - name: Download adb
+              run: |
+                  curl -LO https://dl.google.com/android/repository/platform-tools-latest-darwin.zip
+                  unzip platform-tools-latest-darwin.zip
+                  cp platform-tools/adb .
+
+            - name: Build
+              run: |
+                  pyinstaller --onefile --windowed --name PyADB \
+                      --add-binary "adb:." \
+                      app.py
+                  cd dist && zip -r PyADB-mac.zip PyADB.app
+
+            - uses: softprops/action-gh-release@v2
+              with:
+                  files: dist/PyADB-mac.zip
+
+    linux:
+        runs-on: ubuntu-22.04
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-python@v5
+              with:
+                  python-version: "3.11"
+
+            - name: Install system deps
+              run: |
+                  sudo apt update
+                  sudo apt install -y python3-dev build-essential fakeroot patchelf
+
+            - name: Install python deps
+              run: pip install -r requirements.txt
+
+            - name: Download adb
+              run: |
+                  curl -LO https://dl.google.com/android/repository/platform-tools-latest-linux.zip
+                  unzip platform-tools-latest-linux.zip
+                  cp platform-tools/adb .
+
+            - name: Build binary
+              run: |
+                  pyinstaller --onefile --windowed --name pyadb \
+                      --add-binary "adb:." \
+                      app.py
