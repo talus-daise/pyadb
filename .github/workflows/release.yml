@@ -83,8 +83,8 @@ jobs:
               run: |
                 sudo apt update
                 sudo apt install -y \
-                python3-dev build-essential fakeroot patchelf dpkg libfuse2 squashfs-tools imagemagick \
-                fuse libfuse2 wget desktop-file-utils
+                python3-dev build-essential fakeroot patchelf dpkg \
+                libfuse2 squashfs-tools wget desktop-file-utils imagemagick
 
             - name: Install python deps
               run: pip install -r requirements.txt
@@ -134,7 +134,7 @@ jobs:
 
                 cp dist/PyADB AppDir/usr/bin/pyadb
 
-                cat > AppDir/pyadb.desktop <<EOF
+                cat > AppDir/usr/share/applications/pyadb.desktop <<EOF
                 [Desktop Entry]
                 Type=Application
                 Name=PyADB
@@ -151,7 +151,7 @@ jobs:
 
                 ./linuxdeploy-x86_64.AppImage --appimage-extract-and-run \
                 --appdir AppDir \
-                --desktop-file AppDir/pyadb.desktop \
+                --desktop-file AppDir/usr/share/applications/pyadb.desktop \
                 --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/pyadb.png \
                 --output appimage
 
