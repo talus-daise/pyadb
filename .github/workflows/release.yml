@@ -110,7 +110,7 @@ jobs:
                 Depends: python3, python3-pyside6, android-tools-adb
                 Maintainer: PyADB
                 Description: PyADB GUI tool
-                PyADB is a simple GUI frontend for Android Debug Bridge.
+                 PyADB is a simple GUI frontend for Android Debug Bridge.
                 EOF
 
                 dpkg-deb --build pkg PyADB-${{ github.ref_name }}-linux.deb
