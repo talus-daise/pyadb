@@ -5,6 +5,9 @@ on:
         tags:
             - "v*"
 
+permissions:
+    contents: write
+
 jobs:
     windows:
         runs-on: windows-latest
@@ -27,9 +30,7 @@ jobs:
 
             - name: Build
               run: |
-                  pyinstaller --onefile --windowed --name PyADB ^
-                    --add-binary "adb.exe;." ^
-                    app.py
+                  pyinstaller --onefile --windowed --name PyADB --add-binary "adb.exe;." app.py
 
             - uses: softprops/action-gh-release@v2
               with:
@@ -59,7 +60,8 @@ jobs:
                       app.py
                   cd dist && zip -r PyADB-mac.zip PyADB.app
 
-            - uses: softprops/action-gh-release@v2
+            - name: Create Release
+              uses: softprops/action-gh-release@v2
               with:
                   files: dist/PyADB-mac.zip
 
