@@ -83,7 +83,7 @@ jobs:
               run: |
                 sudo apt update
                 sudo apt install -y \
-                python3-dev build-essential fakeroot patchelf dpkg \
+                python3-dev build-essential fakeroot patchelf dpkg libfuse2 squashfs-tools \
                 fuse libfuse2 wget desktop-file-utils
 
             - name: Install python deps
@@ -149,7 +149,7 @@ jobs:
                 wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/linuxdeploy-x86_64.AppImage
                 chmod +x linuxdeploy-x86_64.AppImage
 
-                ./linuxdeploy-x86_64.AppImage \
+                ./linuxdeploy-x86_64.AppImage --appimage-extract-and-run \
                 --appdir AppDir \
                 --desktop-file AppDir/pyadb.desktop \
                 --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/pyadb.png \
