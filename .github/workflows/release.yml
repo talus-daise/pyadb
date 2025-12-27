@@ -83,7 +83,7 @@ jobs:
               run: |
                 sudo apt update
                 sudo apt install -y \
-                python3-dev build-essential fakeroot patchelf dpkg libfuse2 squashfs-tools \
+                python3-dev build-essential fakeroot patchelf dpkg libfuse2 squashfs-tools imagemagick \
                 fuse libfuse2 wget desktop-file-utils
 
             - name: Install python deps
