@@ -130,6 +130,8 @@ jobs:
 
             - name: Build AppImage
               uses: AppImageCrafters/build-appimage-action@master
+              env:
+                VERSION: ${{ github.ref_name }}
               with:
                 recipe: appimage-builder.yml
 
