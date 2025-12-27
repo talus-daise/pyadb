@@ -142,5 +142,4 @@ jobs:
             - uses: softprops/action-gh-release@v2
               with:
                 files: |
-                    PyADB-${{ github.ref_name }}-linux.deb
                     *.AppImage

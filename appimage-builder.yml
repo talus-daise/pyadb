@@ -35,6 +35,4 @@ AppDir:
     exec: usr/bin/pyadb
 
 AppImage:
-  name: PyADB
   arch: x86_64
-  output: PyADB-${VERSION}-linux.AppImage
