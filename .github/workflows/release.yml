@@ -157,7 +157,7 @@ jobs:
                 mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
                 convert -size 256x256 xc:none -fill black -draw "circle 128,128 128,10" AppDir/pyadb.png
 
-                appimagetool AppDir PyADB-${{ github.ref_name }}.AppImage
+                appimagetool AppDir PyADB-${{ github.ref_name }}-linux.AppImage
 
             # -----------------------
             # Release
