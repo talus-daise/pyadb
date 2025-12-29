@@ -127,17 +127,31 @@ jobs:
                 EOF
 
                 dpkg-deb --build pkg PyADB-${{ github.ref_name }}-linux.deb
-
-            - name: Set up AppImage Builder
-              uses: AppImageCrafters/build-appimage-action@v1
-
+            
             - name: Build AppImage
-              uses: AppImageCrafters/build-appimage-action@master
-              env:
-                VERSION: ${{ github.ref_name }}
-              with:
-                recipe: appimage-builder.yml
+              run: |
+                VERSION=${{ github.ref_name }}
+                VERSION=${VERSION#v}
 
+                mkdir -p AppDir/usr/bin
+                cp dist/PyADB AppDir/usr/bin/pyadb
+
+                cat > AppDir/pyadb.desktop <<EOF
+                [Desktop Entry]
+                Name=PyADB
+                Exec=pyadb
+                Icon=pyadb
+                Type=Application
+                Categories=Utility;
+                EOF
+
+                # アイコンの追加 (必要に応じて変更してください)
+                mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+                convert -size 256x256 xc:none -fill black -draw "circle 128,128 128,10" AppDir/usr/share/icons/hicolor/256x256/apps/pyadb.png
+
+                wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+                chmod +x appimagetool-x86_64.AppImage
+                ./appimagetool-x86_64.AppImage AppDir PyADB-${{ github.ref_name }}.AppImage
 
             # -----------------------
             # Release
